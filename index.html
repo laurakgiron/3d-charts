@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CASTID 3D — tiny solar systems</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='50' rx='44' ry='18' fill='none' stroke='%230755BB' stroke-width='7'/><circle cx='50' cy='50' r='12' fill='%230755BB'/><circle cx='86' cy='42' r='7' fill='%23B8922E'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/charts3d.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wordmark">CASTID<span class="wordmark-tag">3D</span></div>
+    <div class="tagline">CAST CHARTS AS TINY SOLAR SYSTEMS · MANY LIVES AT ONCE</div>
+    <button id="add-pane" class="btn-solid">+ ADD CHART WINDOW</button>
+  </header>
+  <div id="empty-hint" class="empty-hint">CAST A CHART TO BEGIN</div>
+  <main id="panes" class="panes"></main>
+  <footer class="foot">
+    <div class="foot-row"><span class="foot-label">POSITIONS</span><span class="foot-val">GEOCENTRIC · TROPICAL · ECLIPTIC OF DATE · TRUE LATITUDE</span></div>
+    <div class="foot-row"><span class="foot-label">MODEL</span><span class="foot-val">ECLIPTIC FLOOR · CHALDEAN SHELLS · HORIZON &amp; MERIDIAN AS GREAT CIRCLES</span></div>
+    <div class="foot-row"><span class="foot-label">HOUSE SYSTEMS</span><span class="foot-val">PLACIDUS / WHOLE SIGN</span></div>
+    <div class="foot-row"><span class="foot-label">NODE</span><span class="foot-val">MEAN · ON THE MOON'S INCLINED ORBIT</span></div>
+    <div class="foot-row"><span class="foot-label">DRIVE</span><span class="foot-val">DRAG TO ORBIT · WHEEL TO ZOOM · DOUBLE-CLICK TO RESET · HOVER A BODY</span></div>
+  </footer>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
