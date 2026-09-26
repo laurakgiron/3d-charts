@@ -3,6 +3,18 @@
 3D sibling of castid (../castid): the same chart engine, rendered as tiny solar
 systems with three.js. Repo `laurakgiron/3d-charts`.
 
+## Status
+- **LIVE:** https://castid3d.vercel.app (Vercel project `castid3d`, team
+  `team_TCi1DDjT6lfbfyIpLTK9yGgn`, prj_QjhSQqpPiM77iHyXfKscxGH5N6Hi).
+- Deploys are **inline snapshots**, like castid: one `create_deployment` with
+  ALL NINE served files — `index.html`, `css/charts3d.css`, `js/app.js`,
+  `js/celestial.js`, `js/ephemeris.js`, `js/geo.js`, `js/glyphs.js`,
+  `js/orrery.js`, `js/stage.js` — `target: production`, framework null.
+  Verify by comparing `list_deployment_files` uids (SHA-1) with `sha1sum`.
+- Git-linked auto-deploys are not possible until Laura adds a GitHub Login
+  Connection to her Vercel account (Vercel → Settings → Login Connections).
+- First deploy: 2026-09-26 from commit 8649132.
+
 ## Run locally
 ```bash
 python3 -m http.server 8421
