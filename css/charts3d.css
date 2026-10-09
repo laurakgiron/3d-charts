@@ -129,6 +129,7 @@ button, input, select {
 .pane {
   border: 1px solid var(--ink);
   background: none;
+  min-width: 0; /* grid items default to min-width:auto; never let content push a window past its column */
   min-height: 420px;
   display: flex;
   flex-direction: column;

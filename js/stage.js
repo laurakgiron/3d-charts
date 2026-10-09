@@ -9,7 +9,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { disposeGroup, toWorld } from './orrery.js';
 
 const PANEL = 0xDCDCDC;
-const DIST = 23.5;
+const DEG = Math.PI / 180;
+const FIT_PAD = 1.06;        // breathing room around the fitted model
+const FALLBACK_ASPECT = 1.6; // used only before a window has a laid-out size
+const SPHERE_R = 12;         // fit radius when a view has no model yet
 
 export class Stage {
   constructor() {
@@ -37,15 +40,14 @@ export class Stage {
       const key = new THREE.DirectionalLight(0xFFFFFF, 1.6); key.position.set(-14, 22, 16); scene.add(key);
       const fill = new THREE.DirectionalLight(0xFFF6E8, 0.5); fill.position.set(18, 6, -10); scene.add(fill);
       const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 300);
-      v = { id, scene, camera, root: null, pickables: [], anchorRot: 0, frame: null, hovered: null, el: null, controls: null, presetName: 'oblique', fresh: true };
+      v = { id, scene, camera, root: null, pickables: [], anchorRot: 0, frame: null, hovered: null, el: null, controls: null, presetName: 'oblique', fresh: true, fit: null, fitSig: null, fitAspect: null };
       this.views.set(id, v);
     }
     if (v.controls) v.controls.dispose();
     v.el = el;
-    if (v.fresh) { v.fresh = false; this.preset(id, 'oblique'); }
     const c = new OrbitControls(v.camera, el);
     c.enableDamping = true; c.dampingFactor = 0.08;
-    c.enablePan = false; c.minDistance = 6; c.maxDistance = 90;
+    c.enablePan = false; c.minDistance = 6; c.maxDistance = 200;
     c.rotateSpeed = 0.7; c.zoomSpeed = 0.8;
     v.controls = c;
     el.addEventListener('pointermove', e => this._pick(v, e));
@@ -71,6 +73,61 @@ export class Stage {
     v.root = built.root; v.pickables = built.pickables;
     v.anchorRot = built.anchorRot; v.frame = built.frame; v.hovered = null;
     v.scene.add(v.root);
+    // Keep the whole model in frame. First model: apply the default preset.
+    // Later models whose extent changed (a storey added, the sky toggled):
+    // rescale the current camera distance so the user's orbit and zoom stay
+    // relative to the model.
+    const prevFit = v.fit, prevSig = v.fitSig;
+    v.fit = built.fit; v.fitSig = built.fitSig;
+    if (v.fresh) { v.fresh = false; this.preset(id, v.presetName); }
+    else if (prevFit && prevSig !== v.fitSig && v.fitAspect != null) {
+      const k = this._fitDistance(v, v.fitAspect, v.fit) / this._fitDistance(v, v.fitAspect, prevFit);
+      v.camera.position.multiplyScalar(k);
+      if (v.controls) v.controls.update();
+    }
+  }
+
+  _aspectOf(v) {
+    const r = v.el ? v.el.getBoundingClientRect() : null;
+    return r && r.width >= 4 && r.height >= 4 ? r.width / r.height : null;
+  }
+
+  // Camera distance along the camera's current direction at which every fit
+  // point of the model lies inside the view frustum for this aspect ratio.
+  // Closed form: for a point p with view-space depth z and lateral offsets
+  // x, y the frustum needs d ≥ z + |x| / tan(hfov/2) and d ≥ z + |y| / tan(vfov/2).
+  _fitDistance(v, aspect, pts = v.fit) {
+    const cam = v.camera;
+    const dir = cam.position.clone();
+    if (dir.lengthSq() < 1e-9) dir.set(0, 0.58, 0.81);
+    dir.normalize();
+    const fwd = dir.clone().negate();
+    const right = new THREE.Vector3().crossVectors(fwd, cam.up);
+    if (right.lengthSq() < 1e-9) right.crossVectors(fwd, Math.abs(fwd.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, -1));
+    right.normalize();
+    const up = new THREE.Vector3().crossVectors(right, fwd);
+    const tv = Math.tan(cam.fov / 2 * DEG), th = tv * aspect;
+    let d = 0;
+    if (pts && pts.length) {
+      for (const p of pts) {
+        const z = p.dot(dir);
+        d = Math.max(d, z + Math.abs(p.dot(right)) / th, z + Math.abs(p.dot(up)) / tv);
+      }
+    } else {
+      d = SPHERE_R / Math.sin(Math.atan(Math.min(tv, th)));
+    }
+    return d * FIT_PAD;
+  }
+
+  // The window changed shape: refit for the new aspect, preserving whatever
+  // zoom the user applied relative to the old fit.
+  _refit(v, aspect) {
+    const cur = v.camera.position.length();
+    const dNew = this._fitDistance(v, aspect);
+    const dOld = v.fitAspect != null ? this._fitDistance(v, v.fitAspect) : cur;
+    v.camera.position.multiplyScalar(dNew / dOld);
+    v.fitAspect = aspect;
+    if (v.controls) v.controls.update();
   }
 
   // Camera presets. 'sky' stands the viewer at the north point of the
@@ -82,17 +139,18 @@ export class Stage {
     const cam = v.camera;
     v.presetName = name;
     cam.up.set(0, 1, 0);
-    // Frame the wheel: pull back on tall or narrow windows.
-    const r = v.el ? v.el.getBoundingClientRect() : null;
-    const aspect = r && r.height ? r.width / r.height : 1.6;
-    const d = DIST * Math.max(1, 1.25 / aspect) * (name === 'above' ? 1.02 : 1);
-    if (name === 'above') cam.position.set(0, d, 0.02);
-    else if (name === 'edge') cam.position.set(0, d * 0.16, d);
+    // Viewing direction first; the distance comes from fitting the model to
+    // the window's actual shape, so narrow or wide windows never crop it.
+    if (name === 'above') cam.position.set(0, 1, 0.001);
+    else if (name === 'edge') cam.position.set(0, 0.16, 1);
     else if (name === 'sky' && v.frame) {
       const north = toWorld(v.frame.north, v.anchorRot), zen = toWorld(v.frame.zenith, v.anchorRot);
       cam.up.copy(zen);
-      cam.position.copy(north).multiplyScalar(d * 0.85).addScaledVector(zen, d * 0.42);
-    } else { v.presetName = 'oblique'; cam.position.set(0, d * Math.sin(0.62), d * Math.cos(0.62)); }
+      cam.position.copy(north).multiplyScalar(0.85).addScaledVector(zen, 0.42);
+    } else { v.presetName = 'oblique'; cam.position.set(0, Math.sin(0.62), Math.cos(0.62)); }
+    const aspect = this._aspectOf(v);
+    cam.position.normalize().multiplyScalar(this._fitDistance(v, aspect ?? FALLBACK_ASPECT));
+    v.fitAspect = aspect; // null → the render loop refits once the box has a size
     cam.lookAt(0, 0, 0);
     if (v.controls) v.controls.update();
   }
@@ -120,11 +178,17 @@ export class Stage {
 
   _loop() {
     requestAnimationFrame(this._loop);
-    const w = window.innerWidth, h = window.innerHeight;
-    if (this.canvas.width !== Math.floor(w * this.renderer.getPixelRatio()) || this.canvas.height !== Math.floor(h * this.renderer.getPixelRatio())) {
-      this.renderer.setSize(w, h, false);
-    }
     const R = this.renderer;
+    // Size the drawing buffer from the canvas's own CSS box, not the window:
+    // window.innerWidth includes a classic scrollbar, which would stretch the
+    // buffer into a narrower box and shift every scene sideways.
+    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+    if (!w || !h) return;
+    const pr = Math.min(window.devicePixelRatio || 1, 2);
+    if (pr !== R.getPixelRatio()) R.setPixelRatio(pr);
+    if (this.canvas.width !== Math.floor(w * pr) || this.canvas.height !== Math.floor(h * pr)) {
+      R.setSize(w, h, false);
+    }
     R.setScissorTest(false);
     R.clear();
     R.setScissorTest(true);
@@ -135,7 +199,9 @@ export class Stage {
       const left = rect.left, bottom = h - rect.bottom;
       R.setViewport(left, bottom, rect.width, rect.height);
       R.setScissor(left, bottom, rect.width, rect.height);
-      v.camera.aspect = rect.width / rect.height;
+      const aspect = rect.width / rect.height;
+      if (v.fitAspect == null || Math.abs(aspect - v.fitAspect) > 1e-3) this._refit(v, aspect);
+      v.camera.aspect = aspect;
       v.camera.updateProjectionMatrix();
       v.controls.update();
       R.render(v.scene, v.camera);

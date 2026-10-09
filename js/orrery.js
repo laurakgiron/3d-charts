@@ -40,15 +40,20 @@ const Y = new THREE.Vector3(0, 1, 0);
 
 // ------------------------------------------------------------- textures
 
+// Static textures (glyphs, sign glyphs, fixed text) are cached and shared.
+// Textures that change with the chart (degree labels) are NOT cached: a
+// running animation would otherwise mint a new texture for every body on
+// every step and never release any of them. Those are tagged `owned` and
+// disposed with the sprite that carries them (see disposeGroup).
 const texCache = new Map();
 function canvasTexture(key, w, h, draw) {
-  if (texCache.has(key)) return texCache.get(key);
+  if (key && texCache.has(key)) return texCache.get(key);
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   draw(c.getContext('2d'), w, h);
   const t = new THREE.CanvasTexture(c);
   t.anisotropy = 4; t.colorSpace = THREE.SRGBColorSpace;
-  texCache.set(key, t);
+  if (key) texCache.set(key, t); else t.userData.owned = true;
   return t;
 }
 
@@ -69,7 +74,7 @@ function strokeGlyph(ctx, key, cx, cy, px, color, lw = 1.6) {
 function planetLabelTexture(p, color, showDeg) {
   const f = formatLon(p.lon);
   const deg = showDeg ? `${f.deg}°${String(f.min).padStart(2, '0')}` : '';
-  const key = `pl|${p.key}|${color}|${deg}|${p.retro ? 'r' : ''}`;
+  const key = deg ? null : `pl|${p.key}|${color}|${p.retro ? 'r' : ''}`;
   return canvasTexture(key, 160, 200, (ctx, w, h) => {
     ctx.clearRect(0, 0, w, h);
     if (!strokeGlyph(ctx, p.key, w / 2, 62, 88, color, 1.5)) {
@@ -399,14 +404,44 @@ export function buildOrrery(model) {
   // Anchor: the Ascendant to the left, as on the wheel.
   const anchorRot = (180 - anchorLon) * DEG;
   root.rotation.y = anchorRot;
-  return { root, pickables, frame, anchorRot };
+  const showSky = !!(frame && options.sky !== false);
+  const fit = fitPoints(rings.length, showSky ? frame : null, !!options.antiscia, anchorRot);
+  const fitSig = `${rings.length}|${showSky ? 1 : 0}|${options.antiscia ? 1 : 0}`;
+  return { root, pickables, frame, anchorRot, fit, fitSig };
+}
+
+// World-space points that bound the model: the labelled rim of every storey,
+// and, when the sky is drawn, the horizon / meridian / equator circles with
+// their zenith and pole markers. The stage fits the camera to these, so a
+// window of any shape shows the whole chart. Independent of planet positions,
+// so the fit is stable while a ring animates.
+export function fitPoints(storeys, frame, withAntiscia, anchorRot) {
+  const pts = [];
+  const circle = (r, y, n = 36) => {
+    for (let i = 0; i < n; i++) { const a = (i / n) * 2 * Math.PI; pts.push(new THREE.Vector3(r * Math.cos(a), y, r * Math.sin(a))); }
+  };
+  circle(R_OUT + (withAntiscia ? 1.9 : 1.3), 0);           // rim + AC/DC/MC/IC (or ANTISCIA) labels
+  for (let i = 1; i < storeys; i++) circle(R_IN + 1.1, i * STOREY); // storey rim + its name label
+  if (frame) {
+    const w = v => toWorld(v, anchorRot);
+    const Rf = R_OUT + 1.0;
+    for (const pole of [frame.zenith, frame.east, frame.pole]) {
+      for (const p of greatCircle(pole, 1, 36)) pts.push(w(p).multiplyScalar(R_OUT));
+    }
+    pts.push(w(frame.zenith).multiplyScalar(Rf), w(frame.pole).multiplyScalar(Rf));
+  }
+  return pts;
 }
 
 export function disposeGroup(g) {
   g.traverse(o => {
     if (o.geometry) o.geometry.dispose();
-    // materials & textures are cached and shared; sprite materials are not
-    if (o.isSprite && o.material) o.material.dispose();
+    // materials & textures are cached and shared; sprite materials are not,
+    // nor are the per-moment degree-label textures they may carry
+    if (o.isSprite && o.material) {
+      if (o.material.map && o.material.map.userData.owned) o.material.map.dispose();
+      o.material.dispose();
+    }
     if (o.isMesh && o.material && (o.material.wireframe || (o.material.map && !o.material.isSpriteMaterial))) o.material.dispose();
   });
 }

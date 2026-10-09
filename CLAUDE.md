@@ -13,7 +13,8 @@ systems with three.js. Repo `laurakgiron/3d-charts`.
   Verify by comparing `list_deployment_files` uids (SHA-1) with `sha1sum`.
 - Git-linked auto-deploys are not possible until Laura adds a GitHub Login
   Connection to her Vercel account (Vercel → Settings → Login Connections).
-- First deploy: 2026-09-26 from commit 8649132.
+- First deploy: 2026-09-26 from commit 8649132 (verified: deployment file
+  SHA-1s equal `sha1sum` of that commit's nine files).
 
 ## Run locally
 ```bash
@@ -48,7 +49,19 @@ from this folder, open http://localhost:8421. Zero-build; never scaffold npm/Vit
 - Scene is anchored so the Ascendant is on the left (rotation 180°−asc), like
   the wheel. Houseless charts anchor 0°♈ left.
 - Camera presets: oblique, above (wheel), edge, sky (camera at the horizon's
-  north point, zenith up → east on the left).
+  north point, zenith up → east on the left). A preset only fixes the viewing
+  direction; the distance comes from `Stage._fitDistance`, which fits the
+  model's `fit` points (from `fitPoints` in orrery.js: every storey's labelled
+  rim plus the sky circles) to the window's real aspect ratio. The render loop
+  refits whenever a window changes shape (expand, side panel, resize) and
+  `setRoot` refits when the model's extent changes (storey added, sky toggled),
+  both scaling the current distance so the user's orbit/zoom stay relative.
+  Never size the camera from a constant distance again — that is what cropped
+  the wheel's sides in narrow windows.
+- Degree-label sprite textures are per-moment and owned by their sprite
+  (`texture.userData.owned`), disposed in `disposeGroup`; only static glyph /
+  text textures go in `texCache`. Caching per-moment labels leaked a texture
+  per body per animation step.
 
 ## State
 - localStorage key `castid3d-state-v1` (separate from castid's).
