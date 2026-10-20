@@ -6,15 +6,15 @@ systems with three.js. Repo `laurakgiron/3d-charts`.
 ## Status
 - **LIVE:** https://castid3d.vercel.app (Vercel project `castid3d`, team
   `team_TCi1DDjT6lfbfyIpLTK9yGgn`, prj_QjhSQqpPiM77iHyXfKscxGH5N6Hi).
-- Deploys are **inline snapshots**, like castid: one `create_deployment` with
-  ALL NINE served files — `index.html`, `css/charts3d.css`, `js/app.js`,
-  `js/celestial.js`, `js/ephemeris.js`, `js/geo.js`, `js/glyphs.js`,
-  `js/orrery.js`, `js/stage.js` — `target: production`, framework null.
-  Verify by comparing `list_deployment_files` uids (SHA-1) with `sha1sum`.
-- Git-linked auto-deploys are not possible until Laura adds a GitHub Login
-  Connection to her Vercel account (Vercel → Settings → Login Connections).
-- First deploy: 2026-09-26 from commit 8649132 (verified: deployment file
-  SHA-1s equal `sha1sum` of that commit's nine files).
+- **Git-linked:** the Vercel project is connected to this repo. A push to
+  `main` auto-deploys to production (castid3d.vercel.app); a push to any other
+  branch makes a preview deploy. To ship: merge to `main` and push. Confirm with
+  `list_deployments` (meta.githubCommitSha = the pushed commit, target
+  production, state READY). Do not hand-upload file snapshots any more.
+- Verified 2026-10-20: commit ad6ec53 pushed to main produced production
+  deploy dpl_CAAULukvDzEWjSs1BBFXkoVgmXPN with no manual step.
+- First deploy: 2026-09-26, an inline upload of commit 8649132 (verified:
+  deployment file SHA-1s equal `sha1sum` of that commit's nine files).
 
 ## Run locally
 ```bash
