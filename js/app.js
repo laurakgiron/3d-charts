@@ -146,9 +146,20 @@ function fmtLat(lat) {
 
 function render() {
   const root = $('#panes');
+  // The side panel scrolls on its own when it sits beside the scene; keep each
+  // window's scroll position across the rebuild (e.g. pressing STOP).
+  const sideScroll = new Map();
+  root.querySelectorAll('.pane').forEach(el => {
+    const side = $('.side', el);
+    if (side && side.scrollTop) sideScroll.set(el.dataset.id, side.scrollTop);
+  });
   root.className = 'panes n' + Math.min(state.panes.length, MAX_PANES);
   root.innerHTML = '';
   state.panes.forEach((pane, idx) => root.appendChild(renderPane(pane, idx)));
+  for (const [id, top] of sideScroll) {
+    const side = $(`.pane[data-id="${id}"] .side`, root);
+    if (side) side.scrollTop = top;
+  }
   const addBtn = $('#add-pane');
   addBtn.style.display = state.panes.some(p => p.rings.length) ? '' : 'none';
   addBtn.disabled = state.panes.length >= MAX_PANES;

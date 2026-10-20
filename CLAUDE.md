@@ -36,6 +36,13 @@ from this folder, open http://localhost:8421. Zero-build; never scaffold npm/Vit
   fixed; z-index: -1`, so windows must leave the scene area unpainted.
 - Overlay buttons inside `.scene-box` must stop `pointerdown` propagation or
   OrbitControls' pointer capture eats the click.
+- Window layout: when the side panel sits beside the scene (pane body ≥ 720px,
+  container query), the scene box sets the row height and `.side` has
+  `contain: size; overflow-y: auto`, so the panel scrolls inside the window
+  instead of stretching it and leaving a blank band under the scene. `render()`
+  restores each side panel's `scrollTop` across rebuilds. Keep the base
+  `.scene-box` rule ABOVE the `@container` block in charts3d.css, or the
+  plain `58vh` height overrides the wide-window height.
 
 ## Model (js/orrery.js + js/celestial.js)
 - Ecliptic frame: x → 0°♈, y → 0°♋, z → north ecliptic pole. three.js is y-up:

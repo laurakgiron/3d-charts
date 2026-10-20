@@ -241,20 +241,30 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 }
 
 .wheel-wrap { display: grid; grid-template-columns: 1fr; gap: 0; }
-@container (min-width: 720px) {
-  .wheel-wrap { grid-template-columns: minmax(0, 1fr) 300px; }
-  .side { border-left: 1px solid var(--ink); border-top: none !important; }
-  .scene-box { height: min(72vh, 760px); }
-}
-.wheel-wrap.nosides { grid-template-columns: 1fr; }
-.wheel-wrap.nosides .side { display: none; }
-.pane.expanded .scene-box { height: min(86vh, 980px); }
 
+/* Base scene size. Declared before the container query below so the wide
+   size can override it (it used to come after and silently won). */
 .scene-box {
   position: relative; min-height: 380px; height: 58vh;
   touch-action: none; cursor: grab; user-select: none;
 }
 .scene-box:active { cursor: grabbing; }
+
+@container (min-width: 720px) {
+  .wheel-wrap { grid-template-columns: minmax(0, 1fr) 300px; }
+  .scene-box { height: min(72vh, 760px); }
+  /* Side panel beside the scene: the scene sets the window's height and the
+     panel scrolls inside it. Size containment stops the panel's long tables
+     from stretching the row, which left a blank band under the scene. */
+  .side {
+    border-left: 1px solid var(--ink); border-top: none !important;
+    contain: size; overflow-y: auto; overscroll-behavior: contain;
+    scrollbar-width: thin; scrollbar-color: var(--ink) transparent;
+  }
+}
+.wheel-wrap.nosides { grid-template-columns: 1fr; }
+.wheel-wrap.nosides .side { display: none; }
+.pane.expanded .scene-box { height: min(86vh, 980px); }
 
 .hud {
   position: absolute; left: 12px; bottom: 12px; pointer-events: none;
