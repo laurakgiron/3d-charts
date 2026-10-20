@@ -87,13 +87,36 @@ function planetLabelTexture(p, color, showDeg) {
   });
 }
 
+// A line of text on a canvas exactly as wide as the text needs (plus a
+// margin), 128px tall. The sprite takes its width from the texture's own
+// aspect ratio, so labels are never clipped and never stretched.
+const TEXT_H = 128;
+const measureCtx = document.createElement('canvas').getContext('2d');
 function textTexture(text, color, size = 64, weight = 600) {
-  return canvasTexture(`tx|${text}|${color}|${size}|${weight}`, 256, 128, (ctx, w, h) => {
-    ctx.clearRect(0, 0, w, h);
+  const font = `${weight} ${size}px Cinzel, serif`;
+  measureCtx.font = font;
+  const w = Math.max(32, Math.ceil(measureCtx.measureText(text).width + size * 0.8));
+  const t = canvasTexture(`tx|${text}|${color}|${size}|${weight}`, w, TEXT_H, (ctx, cw, ch) => {
+    ctx.clearRect(0, 0, cw, ch);
     ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = `${weight} ${size}px Cinzel, serif`;
-    ctx.fillText(text, w / 2, h / 2);
+    ctx.font = font;
+    ctx.fillText(text, cw / 2, ch / 2);
   });
+  t.userData.aspect = t.image.width / t.image.height;
+  return t;
+}
+
+// Text label of a given world height; width follows the text.
+function textSprite(text, color, size, weight, worldH, opts) {
+  const tex = textTexture(text, color, size, weight);
+  return sprite(tex, worldH, tex.userData.aspect, opts);
+}
+
+// Webfonts can arrive after the first textures were drawn with a fallback
+// face; the app calls this once Cinzel is in, then rebuilds every scene.
+export function clearTextCache() {
+  for (const t of texCache.values()) t.dispose();
+  texCache.clear();
 }
 
 function signTexture(key, color) {
@@ -197,7 +220,7 @@ function houses(chart, y = 0) {
     if (major) g.add(rod(planePos(c, R_HUB, y), planePos(c, R_IN, y), 0.028, solidMat(INK)));
     else g.add(polyline([planePos(c, R_HUB, y), planePos(c, R_IN, y)], lineMat(INK, 0.45)));
     const mid = c + norm(chart.cusps[(h + 1) % 12] - c) / 2;
-    const s = sprite(textTexture(ROMAN[h], INK, 56, 500), 0.55, 2, { opacity: 0.8 });
+    const s = textSprite(ROMAN[h], INK, 56, 500, 0.55, { opacity: 0.8 });
     s.position.copy(planePos(mid, R_HUB + 0.55, y + 0.05));
     g.add(s);
   }
@@ -223,20 +246,26 @@ function sky(frame, y = 0) {
   const ascP = toThree(V.scale(frame.ascV, R_OUT)), mcP = toThree(V.scale(frame.mcV, R_OUT));
   g.add(rod(ascP.clone().negate(), ascP, 0.045, solidMat(INK)));
   g.add(rod(mcP.clone().negate(), mcP, 0.03, solidMat(INK)));
-  const lab = (t, v, k) => { const s = sprite(textTexture(t, INK, 60, 700), 0.62, 2); s.position.copy(toThree(V.scale(v, k))); g.add(s); };
+  const lab = (t, v, k) => { const s = textSprite(t, INK, 60, 700, 0.62); s.position.copy(toThree(V.scale(v, k))); g.add(s); };
   lab('AC', frame.ascV, R_OUT + 0.9); lab('DC', V.scale(frame.ascV, -1), R_OUT + 0.9);
   lab('MC', frame.mcV, R_OUT + 0.9); lab('IC', V.scale(frame.mcV, -1), R_OUT + 0.9);
   // zenith & north celestial pole markers
   const z = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 8), solidMat(INK));
   z.position.copy(toThree(V.scale(frame.zenith, R_OUT))); g.add(z);
-  const zl = sprite(textTexture('ZENITH', INK, 40, 500), 0.42, 2, { opacity: 0.75 });
+  const zl = textSprite('ZENITH', INK, 40, 500, 0.42, { opacity: 0.75 });
   zl.position.copy(toThree(V.scale(frame.zenith, R_OUT + 0.7))); g.add(zl);
   const np = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 6), solidMat(INK));
   np.position.copy(toThree(V.scale(frame.pole, R_OUT))); g.add(np);
-  const nl = sprite(textTexture('POLE', INK, 40, 500), 0.4, 2, { opacity: 0.6 });
+  const nl = textSprite('POLE', INK, 40, 500, 0.4, { opacity: 0.6 });
   nl.position.copy(toThree(V.scale(frame.pole, R_OUT + 0.6))); g.add(nl);
   g.position.y = y;
   return g;
+}
+
+// Storey names are shown in full up to 24 characters, then end in an ellipsis.
+function storeyLabel(name) {
+  const t = String(name || '').toUpperCase().trim();
+  return t.length > 24 ? t.slice(0, 23).trimEnd() + '…' : t;
 }
 
 function bodyRadius(key) { return BODY_RADIUS[key] || 0.17; }
@@ -256,7 +285,7 @@ function storey(ring, idx, opts, base) {
     const disc = new THREE.Mesh(new THREE.CircleGeometry(R_IN, 96), glassMat(color, 0.05));
     disc.rotation.x = -Math.PI / 2; disc.position.y = y; disc.renderOrder = -1;
     g.add(disc);
-    const t = sprite(textTexture(ring.label.toUpperCase().slice(0, 18), color, 44, 500), 0.5, 4, { opacity: 0.85 });
+    const t = textSprite(storeyLabel(ring.label), color, 44, 500, 0.5, { opacity: 0.85 });
     t.position.set(0, y + 0.3, R_IN + 0.9);
     g.add(t);
   }
@@ -338,7 +367,7 @@ function antiscia(chart, color, y, useLat) {
   mirror.rotation.y = Math.PI / 2; mirror.position.y = y; mirror.renderOrder = -1; // plane x = 0 → contains 0°♋/0°♑
   g.add(mirror);
   g.add(rod(planePos(90, R_OUT, y), planePos(270, R_OUT, y), 0.025, solidMat('#9C6B1F')));
-  const lab = sprite(textTexture('ANTISCIA', '#9C6B1F', 40, 500), 0.42, 3, { opacity: 0.85 });
+  const lab = textSprite('ANTISCIA', '#9C6B1F', 40, 500, 0.42, { opacity: 0.85 });
   lab.position.copy(planePos(90, R_OUT + 1.2, y)); g.add(lab);
   for (const p of chart.planets) {
     const r = SHELL[p.key]; if (!r || p.isPoint) continue;

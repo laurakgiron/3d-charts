@@ -69,6 +69,13 @@ from this folder, open http://localhost:8421. Zero-build; never scaffold npm/Vit
   (`texture.userData.owned`), disposed in `disposeGroup`; only static glyph /
   text textures go in `texCache`. Caching per-moment labels leaked a texture
   per body per animation step.
+- Text labels in the scene (storey names, house numerals, AC/MC, ZENITH,
+  POLE, ANTISCIA) go through `textSprite`: the canvas is measured to fit the
+  text and the sprite takes the texture's own aspect ratio, so nothing clips
+  or stretches. Never draw scene text into a fixed-width canvas again (that
+  clipped "PROGRESSED" and stretched every storey name 2×). Storey names show
+  up to 24 characters, then "…". `clearTextCache()` runs once Cinzel loads so
+  labels first drawn in a fallback font are redrawn and re-measured.
 
 ## State
 - localStorage key `castid3d-state-v1` (separate from castid's).

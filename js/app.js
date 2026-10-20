@@ -4,7 +4,7 @@
 
 import { computeChart, computeAspects, findSunrise, findSunReturn, formatLon, houseOf, sunLongitude, directedAngles, ascMc } from './ephemeris.js';
 import { searchPlaces, localToUtcMs, utcToLocalParts, formatInTz, addUnit } from './geo.js';
-import { buildOrrery, RING_COLORS, ASPECT_COLORS, SHELL, toThree } from './orrery.js';
+import { buildOrrery, clearTextCache, RING_COLORS, ASPECT_COLORS, SHELL, toThree } from './orrery.js';
 import { Stage } from './stage.js';
 import { skyFrame, lonLatToVec, V } from './celestial.js';
 import { glyphHtml, SIGN_KEYS } from './glyphs.js';
@@ -475,8 +475,10 @@ function renderSceneView(pane) {
   const ringChips = pane.rings.map((rc, i) => `
     <div class="ring-chip" style="--rc:${RING_COLORS[i]}">
       <span class="ring-dot"></span>
-      <span class="ring-name">${esc(rc.name)}</span>
-      <span class="ring-when">${formatInTz(rc.utcMs, rc.place.tz, false)}${rc.kind === 'progressed' ? ' · PROGRESSED' : rc.kind === 'solararc' ? ' · SOLAR ARC' : rc.unknown ? (rc.sunrise ? ' · SUNRISE' : ' · NOON, NO HOUSES') : ''}</span>
+      <span class="ring-text">
+        <span class="ring-name" title="${esc(rc.name)}">${esc(rc.name)}</span>
+        <span class="ring-when">${formatInTz(rc.utcMs, rc.place.tz, false)}${rc.kind === 'progressed' ? ' · PROGRESSED' : rc.kind === 'solararc' ? ' · SOLAR ARC' : rc.unknown ? (rc.sunrise ? ' · SUNRISE' : ' · NOON, NO HOUSES') : ''}</span>
+      </span>
       <span class="ring-acts">
         ${(!rc.kind || rc.kind === 'radix') ? `<button data-act="edit" data-i="${i}" title="edit">✎</button>` : ''}
         ${i > 0 ? `<button data-act="del" data-i="${i}" title="remove ring">✕</button>` : ''}
@@ -849,7 +851,7 @@ document.addEventListener('DOMContentLoaded', () => {
   render();
   // Sprite labels are drawn with Cinzel; redraw once the webfont is in.
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => {
-    if (document.fonts.check('12px Cinzel')) render();
+    if (document.fonts.check('12px Cinzel')) { clearTextCache(); render(); }
   });
   // Debug/test hook: window.__castid3d.cast({...}) casts a pane without the form.
   window.__castid3d = {
